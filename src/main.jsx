@@ -197,7 +197,7 @@ function App() {
         <div className="topActions"><button className="iconBtn" onClick={loadAll} title="Atualizar"><RefreshCw size={18}/></button><button className="primary" onClick={()=>setModal({type:"launch"})}><Plus size={18}/> Novo lançamento</button></div>
       </header>
 
-      {page==="dashboard" && <Dashboard stats={currentStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
+      {page==="dashboard" && <Dashboard rows={filtered} stats={currentStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
       {page==="lancamentos" && <Launches rows={filtered.filter(r=>!r.origem || r.origem==="dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
       
       {page==="followup" && <FollowUpPage
@@ -294,7 +294,7 @@ function Auth({mode,setMode,showToast}){
   </div></div>
 }
 
-function Dashboard({stats,week,month,chartData,weekChart,period,setPeriod,from,setFrom,to,setTo,onPDF}){
+function Dashboard({rows,stats,week,month,chartData,weekChart,period,setPeriod,from,setFrom,to,setTo,onPDF}){
   return <div className="content">
     <div className="filters">
       <div className="segmented">{[["today","Hoje"],["week","Esta semana"],["month","Este mês"],["custom","Personalizado"]].map(([v,l])=><button className={period===v?"selected":""} onClick={()=>{setPeriod(v); if(v==="week"){const m=monday(new Date());setFrom(iso(m));setTo(iso(new Date(m.getFullYear(),m.getMonth(),m.getDate()+6)))} if(v==="month"){const d=new Date();setFrom(iso(new Date(d.getFullYear(),d.getMonth(),1)));setTo(iso(new Date(d.getFullYear(),d.getMonth()+1,0)))}}} key={v}>{l}</button>)}</div>
@@ -310,7 +310,7 @@ function Dashboard({stats,week,month,chartData,weekChart,period,setPeriod,from,s
       <Stat icon={TrendingUp} label="% de entrada" value={pct(stats.entradaPct)} status={stats.entradaPct>=20&&stats.entradaPct<=30?"green":stats.entradaPct<20?"red":"orange"} sub={stats.entradaPct>=20&&stats.entradaPct<=30?"Dentro do ideal":stats.entradaPct<20?"Abaixo do ideal":"Acima do ideal"}/>
     </div>
 
-    <FollowUpSummary rows={filtered}/>
+    <FollowUpSummary rows={rows}/>
 
     <div className="twoCol">
       <section className="panel"><div className="panelHead"><div><h2>📅 Resultado da semana</h2><span>Segunda a domingo</span></div><Badge value={week.conversao} type="conversion"/></div><MiniStats s={week}/></section>
