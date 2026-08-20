@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Plus, Search, CalendarDays, FileText, Users,
   Pencil, Trash2, LogOut, Menu, X, RefreshCw, Download, TrendingUp,
   WalletCards, Target, CircleDollarSign, UserPlus, Eye, EyeOff, CheckCircle2,
-  AlertCircle, UserRound
+  AlertCircle, UserRound, BarChart3
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "./styles.css";
@@ -105,6 +105,7 @@ function App() {
   },[rows,period,from,to,search]);
 
   const currentStats = useMemo(()=>calc(filtered),[filtered]);
+  const dayStats = useMemo(()=>calc(rows.filter(r=>r.data===isoToday())),[rows]);
   const weekStats = useMemo(()=>{
     const m=monday(new Date()), a=iso(m), b=iso(new Date(m.getFullYear(),m.getMonth(),m.getDate()+6));
     return calc(rows.filter(r=>r.data>=a&&r.data<=b));
@@ -145,28 +146,24 @@ function App() {
   };
 
   const generatePDF=()=>{
-    const doc=new jsPDF();
+    const doc=new jsPDF({unit:"mm",format:"a4"});
     const s=currentStats;
-    let y=18;
-    doc.setFontSize(20); doc.text("BUONO DASHBOARD",14,y); y+=9;
-    doc.setFontSize(11); doc.text(`Relatório: ${dateBR(period==="today"?isoToday():from)} a ${dateBR(period==="today"?isoToday():to)}`,14,y); y+=12;
-    const lines=[
-      `Oportunidades: ${brl(s.oportunidades)}`,
-      `Total fechado: ${brl(s.fechado)}`,
-      `Taxa de conversão: ${pct(s.conversao)} | Meta: ${META_CONVERSAO}%`,
-      `Total de entradas: ${brl(s.entrada)}`,
-      `Percentual de entrada: ${pct(s.entradaPct)} | Ideal: ${META_ENTRADA_MIN}% a ${META_ENTRADA_MAX}%`,
-      `Valor não fechado: ${brl(s.naoFechado)}`,
-      `Saldo dos fechamentos: ${brl(s.saldo)}`
-    ];
-    doc.setFontSize(12); lines.forEach(t=>{doc.text(t,14,y);y+=8});
-    y+=5; doc.setFontSize(14); doc.text("Lançamentos",14,y);y+=8;
-    doc.setFontSize(8);
-    filtered.forEach(r=>{
-      if(y>275){doc.addPage();y=18}
-      doc.text(`${dateBR(r.data)} | ${r.paciente} | Oport. ${brl(r.oportunidade)} | Fech. ${brl(r.fechado)} | Entr. ${brl(r.entrada)}`,14,y); y+=6;
-    });
-    doc.save(`buono-dashboard-${isoToday()}.pdf`);
+    const a=period==="today"?isoToday():from, b=period==="today"?isoToday():to;
+    const W=210,M=14;
+    const dark=()=>doc.setTextColor(25,38,58), muted=()=>doc.setTextColor(105,118,135), blue=()=>doc.setTextColor(13,71,161);
+    doc.setFillColor(13,71,161); doc.rect(0,0,W,28,"F"); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(19); doc.text("BUONO DASHBOARD",M,12); doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.text("Painel de Performance Comercial - Buono Odontologia",M,19);
+    dark(); doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text(`Relatorio do periodo: ${dateBR(a)} a ${dateBR(b)}`,M,37);
+    const cards=[["Oportunidades",brl(s.oportunidades)],["Total fechado",brl(s.fechado)],["Conversao",pct(s.conversao)],["Entradas",brl(s.entrada)],["% entrada",pct(s.entradaPct)],["Nao fechado",brl(s.naoFechado)],["Saldo",brl(s.saldo)]];
+    let x=M,y=44; cards.forEach((c,i)=>{if(i===4){x=M;y=67} doc.setFillColor(247,249,252);doc.roundedRect(x,y,42,17,2,2,"F");muted();doc.setFontSize(7);doc.setFont("helvetica","normal");doc.text(c[0],x+3,y+5);dark();doc.setFontSize(9);doc.setFont("helvetica","bold");doc.text(c[1],x+3,y+11.5);x+=45});
+    y=91;doc.setFillColor(238,245,255);doc.roundedRect(M,y,182,17,2,2,"F");blue();doc.setFontSize(8);doc.setFont("helvetica","bold");doc.text(`Meta conversao: 30% | Resultado: ${pct(s.conversao)} | ${s.conversao>=30?"ACIMA DA META":"ABAIXO DA META"}`,M+4,y+6);const el=s.entradaPct>=20&&s.entradaPct<=30?"DENTRO DO IDEAL":s.entradaPct<20?"ABAIXO DO IDEAL":"ACIMA DO IDEAL";doc.text(`Meta entrada: 20% a 30% | Resultado: ${pct(s.entradaPct)} | ${el}`,M+4,y+12);
+    const follow=calc(filtered.filter(r=>r.origem==="followup"));y=116;dark();doc.setFontSize(10);doc.text("Follow-up no periodo",M,y);muted();doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text(`Fechado: ${brl(follow.fechado)} | Entradas: ${brl(follow.entrada)} | Conversao: ${pct(follow.conversao)}`,M,y+6);
+    y=132;dark();doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text("Lancamentos do periodo",M,y);y+=5;
+    const widths=[18,38,28,28,25,21,22], starts=[M];for(let i=1;i<widths.length;i++)starts.push(starts[i-1]+widths[i-1]);const heads=["Data","Paciente","Oportun.","Fechado","Entrada","Conv.","% Entr."];
+    const header=()=>{doc.setFillColor(13,71,161);doc.rect(M,y,180,8,"F");doc.setTextColor(255,255,255);doc.setFontSize(7);doc.setFont("helvetica","bold");heads.forEach((h,i)=>doc.text(h,starts[i]+1.5,y+5.2));y+=8};header();
+    filtered.forEach((r,i)=>{if(y>276){doc.addPage();y=15;header()}const cv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0,en=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;const g=i%2?248:253;doc.setFillColor(g,g,g);doc.rect(M,y,180,8,"F");dark();doc.setFont("helvetica","normal");doc.setFontSize(6.7);let name=String(r.paciente||"");if(name.length>21)name=name.slice(0,20)+"...";[dateBR(r.data).slice(0,5),name,brl(r.oportunidade),brl(r.fechado),brl(r.entrada),pct(cv),pct(en)].forEach((v,j)=>doc.text(String(v),starts[j]+1.5,y+5.2));y+=8});
+    if(!filtered.length){muted();doc.setFontSize(9);doc.text("Nenhum lancamento no periodo selecionado.",M,y+7)}
+    const pages=doc.getNumberOfPages();for(let n=1;n<=pages;n++){doc.setPage(n);muted();doc.setFontSize(7);doc.text(`Periodo: ${dateBR(a)} a ${dateBR(b)}`,M,291);doc.text(`Pagina ${n} de ${pages}`,196,291,{align:"right"})}
+    doc.save(`buono-dashboard-${a}-a-${b}.pdf`);
   };
 
   if(!supabase) return <SetupScreen/>;
@@ -194,11 +191,11 @@ function App() {
       <header className="topbar">
         <button className="menu" onClick={()=>setMobileOpen(true)}><Menu/></button>
         <div><h1>{page==="dashboard"?"Painel de Performance":page==="lancamentos"?"Lançamentos":page==="followup"?"Follow-up":"Usuários"}</h1><span>Buono Odontologia</span></div>
-        <div className="topActions"><button className="iconBtn" onClick={loadAll} title="Atualizar"><RefreshCw size={18}/></button><button className="primary" onClick={()=>setModal({type:"launch"})}><Plus size={18}/> Novo lançamento</button></div>
+        <div className="topActions"><button className="iconBtn" onClick={loadAll} title="Atualizar"><RefreshCw size={18}/></button><button className="outline" onClick={()=>setModal({type:"launch",origem:"total_dia"})}><BarChart3 size={18}/> Total do dia</button><button className="primary" onClick={()=>setModal({type:"launch"})}><Plus size={18}/> Novo lançamento</button></div>
       </header>
 
-      {page==="dashboard" && <Dashboard rows={filtered} stats={currentStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
-      {page==="lancamentos" && <Launches rows={filtered.filter(r=>!r.origem || r.origem==="dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
+      {page==="dashboard" && <Dashboard rows={filtered} stats={currentStats} day={dayStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
+      {page==="lancamentos" && <Launches rows={filtered.filter(r=>!r.origem || r.origem==="dia" || r.origem==="total_dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
       
       {page==="followup" && <FollowUpPage
         rows={filtered.filter(r=>r.origem==="followup")}
@@ -294,7 +291,7 @@ function Auth({mode,setMode,showToast}){
   </div></div>
 }
 
-function Dashboard({rows,stats,week,month,chartData,weekChart,period,setPeriod,from,setFrom,to,setTo,onPDF}){
+function Dashboard({rows,stats,day,week,month,chartData,weekChart,period,setPeriod,from,setFrom,to,setTo,onPDF}){
   return <div className="content">
     <div className="filters">
       <div className="segmented">{[["today","Hoje"],["week","Esta semana"],["month","Este mês"],["custom","Personalizado"]].map(([v,l])=><button className={period===v?"selected":""} onClick={()=>{setPeriod(v); if(v==="week"){const m=monday(new Date());setFrom(iso(m));setTo(iso(new Date(m.getFullYear(),m.getMonth(),m.getDate()+6)))} if(v==="month"){const d=new Date();setFrom(iso(new Date(d.getFullYear(),d.getMonth(),1)));setTo(iso(new Date(d.getFullYear(),d.getMonth()+1,0)))}}} key={v}>{l}</button>)}</div>
@@ -312,7 +309,8 @@ function Dashboard({rows,stats,week,month,chartData,weekChart,period,setPeriod,f
 
     <FollowUpSummary rows={rows}/>
 
-    <div className="twoCol">
+    <div className="threeCol">
+      <section className="panel"><div className="panelHead"><div><h2>☀️ Resultado do dia</h2><span>Hoje</span></div><Badge value={day.conversao} type="conversion"/></div><MiniStats s={day}/></section>
       <section className="panel"><div className="panelHead"><div><h2>📅 Resultado da semana</h2><span>Segunda a domingo</span></div><Badge value={week.conversao} type="conversion"/></div><MiniStats s={week}/></section>
       <section className="panel"><div className="panelHead"><div><h2>🗓️ Resultado do mês</h2><span>Mês atual</span></div><Badge value={month.conversao} type="conversion"/></div><MiniStats s={month}/></section>
     </div>
@@ -346,17 +344,18 @@ function LaunchModal({row,origem="dia",onClose,onSaved,showToast}){
   const [busy,setBusy]=useState(false);
   const save=async(e)=>{
     e.preventDefault();setBusy(true);
-    const payload={data:form.data,paciente:form.paciente.trim(),oportunidade:Number(form.oportunidade||0),fechado:Number(form.fechado||0),entrada:Number(form.entrada||0),origem:row?.origem||origem||"dia",updated_at:new Date().toISOString()};
+    const payload={data:form.data,paciente:(origem==="total_dia"?"TOTAL DO DIA":form.paciente.trim()),oportunidade:Number(form.oportunidade||0),fechado:Number(form.fechado||0),entrada:Number(form.entrada||0),origem:row?.origem||origem||"dia",updated_at:new Date().toISOString()};
     try{
-      if(!payload.paciente) throw new Error("Informe o nome do paciente.");
+      if(origem!=="total_dia" && !payload.paciente) throw new Error("Informe o nome do paciente.");
       if(payload.fechado>payload.oportunidade) throw new Error("O valor fechado não pode ser maior que a oportunidade.");
       if(payload.entrada>payload.fechado) throw new Error("A entrada não pode ser maior que o valor fechado.");
       const q=row ? supabase.from("lancamentos").update(payload).eq("id",row.id) : supabase.from("lancamentos").insert(payload);
       const {error}=await q;if(error) throw error;onSaved();
     }catch(err){showToast(err.message,"err")}finally{setBusy(false)}
   };
-  return <div className="overlay"><div className="modal"><div className="modalHead"><div><h2>{row?"Editar lançamento":origem==="followup"?"Novo fechamento de Follow-up":"Novo lançamento"}</h2><span>{origem==="followup"?"Este fechamento será somado automaticamente ao resultado geral.":"Preencha somente os dados do paciente."}</span></div><button onClick={onClose}><X/></button></div>
-    <form onSubmit={save} className="formGrid"><label>Data<input type="date" value={form.data} onChange={e=>setForm({...form,data:e.target.value})} required/></label><label className="full2">Nome do paciente<input value={form.paciente} onChange={e=>setForm({...form,paciente:e.target.value})} placeholder="Ex.: João da Silva" required/></label>
+  return <div className="overlay"><div className="modal"><div className="modalHead"><div><h2>{row?"Editar lançamento":origem==="followup"?"Novo fechamento de Follow-up":origem==="total_dia"?"Lançamento total do dia":"Novo lançamento"}</h2>
+          <span>{origem==="followup"?"Este fechamento será somado automaticamente ao resultado geral.":origem==="total_dia"?"Informe apenas os totais consolidados do dia. Não repita valores já lançados paciente por paciente.":"Preencha somente os dados do paciente."}</span></div><button onClick={onClose}><X/></button></div>
+    <form onSubmit={save} className="formGrid"><label>Data<input type="date" value={form.data} onChange={e=>setForm({...form,data:e.target.value})} required/></label>{origem!=="total_dia"&&<label className="full2">Nome do paciente<input value={form.paciente} onChange={e=>setForm({...form,paciente:e.target.value})} placeholder="Ex.: João da Silva" required/></label>}
     <label>Valor da oportunidade<input inputMode="decimal" value={form.oportunidade} onChange={e=>setForm({...form,oportunidade:e.target.value.replace(",",".")})} placeholder="5000.00" required/></label>
     <label>Valor fechado<input inputMode="decimal" value={form.fechado} onChange={e=>setForm({...form,fechado:e.target.value.replace(",",".")})} placeholder="3500.00" required/></label>
     <label>Valor da entrada<input inputMode="decimal" value={form.entrada} onChange={e=>setForm({...form,entrada:e.target.value.replace(",",".")})} placeholder="700.00" required/></label>
