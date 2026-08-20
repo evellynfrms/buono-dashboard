@@ -33,16 +33,29 @@ const monday = (d) => {
   const day = x.getDay() || 7; x.setDate(x.getDate() - day + 1); return x;
 };
 const iso = (d) => new Date(d).toISOString().slice(0,10);
-const calc = (rows) => {
-  const oportunidades = rows.reduce((s,r)=>s+Number(r.oportunidade||0),0);
-  const fechado = rows.reduce((s,r)=>s+Number(r.fechado||0),0);
-  const entrada = rows.reduce((s,r)=>s+Number(r.entrada||0),0);
+const calc = (rows=[]) => {
+  const soma = (campo) => rows.reduce((total,r)=>{
+    const valor = Number(r?.[campo] ?? 0);
+    return total + (Number.isFinite(valor) ? valor : 0);
+  },0);
+
+  const oportunidades = soma("oportunidade");
+  const fechado = soma("fechado");
+  const entrada = soma("entrada");
+
+  // IMPORTANTE: nunca calcular a média dos percentuais individuais.
+  // O percentual consolidado usa os TOTAIS do período.
+  const conversao = oportunidades > 0 ? (fechado / oportunidades) * 100 : 0;
+  const entradaPct = fechado > 0 ? (entrada / fechado) * 100 : 0;
+
   return {
-    oportunidades, fechado, entrada,
-    conversao: oportunidades ? fechado/oportunidades*100 : 0,
-    entradaPct: fechado ? entrada/fechado*100 : 0,
-    naoFechado: oportunidades-fechado,
-    saldo: fechado-entrada
+    oportunidades,
+    fechado,
+    entrada,
+    conversao,
+    entradaPct,
+    naoFechado: oportunidades - fechado,
+    saldo: fechado - entrada
   };
 };
 const moneyInput = (v) => String(v ?? "").replace(/\D/g,"");
@@ -96,14 +109,22 @@ function App() {
     setLoading(true); await Promise.all([loadRows(),loadUsers()]); setLoading(false);
   };
 
+  // Dados do período: esta é a base oficial de TODOS os indicadores.
+  // A busca por nome do paciente NÃO pode alterar os totais, conversão ou % de entrada.
   const filtered = useMemo(()=>{
     const a = period==="today" ? isoToday() : from;
     const b = period==="today" ? isoToday() : to;
-    let list=rows.filter(r=>r.data>=a && r.data<=b);
-    if(search.trim()) list=list.filter(r=>r.paciente.toLowerCase().includes(search.toLowerCase()));
-    return list;
-  },[rows,period,from,to,search]);
+    return rows.filter(r=>r.data>=a && r.data<=b);
+  },[rows,period,from,to]);
 
+  // Busca serve apenas para a tabela/histórico.
+  const tableFiltered = useMemo(()=>{
+    if(!search.trim()) return filtered;
+    return filtered.filter(r=>(r.paciente||"").toLowerCase().includes(search.toLowerCase()));
+  },[filtered,search]);
+
+  // REGRA OFICIAL:
+  // % entrada = SOMA DAS ENTRADAS DO PERÍODO / SOMA DOS FECHAMENTOS DO PERÍODO × 100.
   const currentStats = useMemo(()=>calc(filtered),[filtered]);
   const dayStats = useMemo(()=>calc(rows.filter(r=>r.data===isoToday())),[rows]);
   const weekStats = useMemo(()=>{
@@ -195,7 +216,7 @@ function App() {
       </header>
 
       {page==="dashboard" && <Dashboard rows={filtered} stats={currentStats} day={dayStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
-      {page==="lancamentos" && <Launches rows={filtered.filter(r=>!r.origem || r.origem==="dia" || r.origem==="total_dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
+      {page==="lancamentos" && <Launches rows={tableFiltered.filter(r=>!r.origem || r.origem==="dia" || r.origem==="total_dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
       
       {page==="followup" && <FollowUpPage
         rows={filtered.filter(r=>r.origem==="followup")}
@@ -304,7 +325,7 @@ function Dashboard({rows,stats,day,week,month,chartData,weekChart,period,setPeri
       <Stat icon={CheckCircle2} label="Total fechado" value={brl(stats.fechado)} positive/>
       <Stat icon={Target} label="Taxa de conversão" value={pct(stats.conversao)} status={stats.conversao>=META_CONVERSAO?"green":"red"} sub={stats.conversao>=META_CONVERSAO?"Acima da meta":"Abaixo da meta"}/>
       <Stat icon={WalletCards} label="Total de entradas" value={brl(stats.entrada)}/>
-      <Stat icon={TrendingUp} label="% de entrada" value={pct(stats.entradaPct)} status={stats.entradaPct>=20&&stats.entradaPct<=30?"green":stats.entradaPct<20?"red":"orange"} sub={stats.entradaPct>=20&&stats.entradaPct<=30?"Dentro do ideal":stats.entradaPct<20?"Abaixo do ideal":"Acima do ideal"}/>
+      <Stat icon={TrendingUp} label="% de entrada" value={pct(stats.entradaPct)} status={stats.entradaPct>=20&&stats.entradaPct<=30?"green":stats.entradaPct<20?"red":"orange"} sub={`${stats.entradaPct>=20&&stats.entradaPct<=30?"Dentro do ideal":stats.entradaPct<20?"Abaixo do ideal":"Acima do ideal"} · ${brl(stats.entrada)} ÷ ${brl(stats.fechado)}`}/>
     </div>
 
     <FollowUpSummary rows={rows}/>
