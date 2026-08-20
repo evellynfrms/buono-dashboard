@@ -175,6 +175,7 @@ function App() {
   const nav=[
     ["dashboard","Dashboard",LayoutDashboard],
     ["lancamentos","Lançamentos",FileText],
+    ["followup","Follow-up",TrendingUp],
     ["usuarios","Usuários",Users]
   ];
 
@@ -191,15 +192,23 @@ function App() {
     <main className="main">
       <header className="topbar">
         <button className="menu" onClick={()=>setMobileOpen(true)}><Menu/></button>
-        <div><h1>{page==="dashboard"?"Painel de Performance":page==="lancamentos"?"Lançamentos":"Usuários"}</h1><span>Buono Odontologia</span></div>
+        <div><h1>{page==="dashboard"?"Painel de Performance":page==="lancamentos"?"Lançamentos":page==="followup"?"Follow-up":"Usuários"}</h1><span>Buono Odontologia</span></div>
         <div className="topActions"><button className="iconBtn" onClick={loadAll} title="Atualizar"><RefreshCw size={18}/></button><button className="primary" onClick={()=>setModal({type:"launch"})}><Plus size={18}/> Novo lançamento</button></div>
       </header>
 
       {page==="dashboard" && <Dashboard stats={currentStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
-      {page==="lancamentos" && <Launches rows={filtered} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
+      {page==="lancamentos" && <Launches rows={filtered.filter(r=>!r.origem || r.origem==="dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
+      
+      {page==="followup" && <FollowUpPage
+        rows={filtered.filter(r=>r.origem==="followup")}
+        onEdit={r=>setModal({type:"launch",row:r,origem:"followup"})}
+        onDelete={deleteRow}
+        onNew={()=>setModal({type:"launch",origem:"followup"})}
+      />}
+
       {page==="usuarios" && <UsersPage users={users} onRefresh={loadUsers} showToast={showToast}/>}
 
-      {modal?.type==="launch" && <LaunchModal row={modal.row} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadRows();showToast("Lançamento salvo com sucesso.")}} showToast={showToast}/>}
+      {modal?.type==="launch" && <LaunchModal row={modal.row} origem={modal.origem} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadRows();showToast("Lançamento salvo com sucesso.")}} showToast={showToast}/>}
       {toast && <div className={`toast ${toast.type==="err"?"err":""}`}>{toast.type==="err"?<AlertCircle size={18}/>:<CheckCircle2 size={18}/>} {toast.message}</div>}
     </main>
   </div>;
@@ -248,6 +257,8 @@ function Dashboard({stats,week,month,chartData,weekChart,period,setPeriod,from,s
       <Stat icon={TrendingUp} label="% de entrada" value={pct(stats.entradaPct)} status={stats.entradaPct>=20&&stats.entradaPct<=30?"green":stats.entradaPct<20?"red":"orange"} sub={stats.entradaPct>=20&&stats.entradaPct<=30?"Dentro do ideal":stats.entradaPct<20?"Abaixo do ideal":"Acima do ideal"}/>
     </div>
 
+    <FollowUpSummary rows={filtered}/>
+
     <div className="twoCol">
       <section className="panel"><div className="panelHead"><div><h2>📅 Resultado da semana</h2><span>Segunda a domingo</span></div><Badge value={week.conversao} type="conversion"/></div><MiniStats s={week}/></section>
       <section className="panel"><div className="panelHead"><div><h2>🗓️ Resultado do mês</h2><span>Mês atual</span></div><Badge value={month.conversao} type="conversion"/></div><MiniStats s={month}/></section>
@@ -277,12 +288,12 @@ function Launches({rows,search,setSearch,onEdit,onDelete,stats}){
   {!rows.length&&<tr><td colSpan="8" className="empty">Nenhum lançamento encontrado.</td></tr>}</tbody></table></section></div>
 }
 
-function LaunchModal({row,onClose,onSaved,showToast}){
+function LaunchModal({row,origem="dia",onClose,onSaved,showToast}){
   const [form,setForm]=useState({data:row?.data||isoToday(),paciente:row?.paciente||"",oportunidade:row?.oportunidade??"",fechado:row?.fechado??"",entrada:row?.entrada??""});
   const [busy,setBusy]=useState(false);
   const save=async(e)=>{
     e.preventDefault();setBusy(true);
-    const payload={data:form.data,paciente:form.paciente.trim(),oportunidade:Number(form.oportunidade||0),fechado:Number(form.fechado||0),entrada:Number(form.entrada||0),updated_at:new Date().toISOString()};
+    const payload={data:form.data,paciente:form.paciente.trim(),oportunidade:Number(form.oportunidade||0),fechado:Number(form.fechado||0),entrada:Number(form.entrada||0),origem:row?.origem||origem||"dia",updated_at:new Date().toISOString()};
     try{
       if(!payload.paciente) throw new Error("Informe o nome do paciente.");
       if(payload.fechado>payload.oportunidade) throw new Error("O valor fechado não pode ser maior que a oportunidade.");
@@ -291,13 +302,72 @@ function LaunchModal({row,onClose,onSaved,showToast}){
       const {error}=await q;if(error) throw error;onSaved();
     }catch(err){showToast(err.message,"err")}finally{setBusy(false)}
   };
-  return <div className="overlay"><div className="modal"><div className="modalHead"><div><h2>{row?"Editar lançamento":"Novo lançamento"}</h2><span>Preencha somente os dados do paciente.</span></div><button onClick={onClose}><X/></button></div>
+  return <div className="overlay"><div className="modal"><div className="modalHead"><div><h2>{row?"Editar lançamento":origem==="followup"?"Novo fechamento de Follow-up":"Novo lançamento"}</h2><span>{origem==="followup"?"Este fechamento será somado automaticamente ao resultado geral.":"Preencha somente os dados do paciente."}</span></div><button onClick={onClose}><X/></button></div>
     <form onSubmit={save} className="formGrid"><label>Data<input type="date" value={form.data} onChange={e=>setForm({...form,data:e.target.value})} required/></label><label className="full2">Nome do paciente<input value={form.paciente} onChange={e=>setForm({...form,paciente:e.target.value})} placeholder="Ex.: João da Silva" required/></label>
     <label>Valor da oportunidade<input inputMode="decimal" value={form.oportunidade} onChange={e=>setForm({...form,oportunidade:e.target.value.replace(",",".")})} placeholder="5000.00" required/></label>
     <label>Valor fechado<input inputMode="decimal" value={form.fechado} onChange={e=>setForm({...form,fechado:e.target.value.replace(",",".")})} placeholder="3500.00" required/></label>
     <label>Valor da entrada<input inputMode="decimal" value={form.entrada} onChange={e=>setForm({...form,entrada:e.target.value.replace(",",".")})} placeholder="700.00" required/></label>
     <div className="modalActions"><button type="button" className="outline" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy?"Salvando...":"Salvar lançamento"}</button></div></form>
   </div></div>
+}
+
+
+function FollowUpSummary({rows}){
+  const followRows = rows.filter(r=>r.origem==="followup");
+  const s = calc(followRows);
+  return <section className="panel quick" style={{marginTop:15}}>
+    <div>
+      <h2>🔄 Fechamentos de Follow-up</h2>
+      <p>{followRows.length} fechamento(s) recuperado(s) no período · Fechado: <b>{brl(s.fechado)}</b> · Entradas: <b>{brl(s.entrada)}</b></p>
+    </div>
+    <Badge value={s.conversao} type="conversion"/>
+  </section>
+}
+
+function FollowUpPage({rows,onEdit,onDelete,onNew}){
+  const s=calc(rows);
+  return <div className="content">
+    <div className="listTop">
+      <div>
+        <h2>Fechamentos de Follow-up</h2>
+        <span>Fechamentos recuperados posteriormente e somados ao painel geral.</span>
+      </div>
+      <button className="primary" onClick={onNew}><Plus size={17}/> Novo Follow-up</button>
+    </div>
+
+    <div className="cards" style={{gridTemplateColumns:"repeat(4,1fr)",marginBottom:15}}>
+      <Stat icon={CircleDollarSign} label="Oportunidades Follow-up" value={brl(s.oportunidades)}/>
+      <Stat icon={CheckCircle2} label="Fechado Follow-up" value={brl(s.fechado)}/>
+      <Stat icon={WalletCards} label="Entradas Follow-up" value={brl(s.entrada)}/>
+      <Stat icon={Target} label="Conversão Follow-up" value={pct(s.conversao)} status={s.conversao>=META_CONVERSAO?"green":"red"} sub={s.conversao>=META_CONVERSAO?"Acima da meta":"Abaixo da meta"}/>
+    </div>
+
+    <section className="panel tableWrap">
+      <table>
+        <thead><tr><th>Data</th><th>Paciente</th><th>Oportunidade</th><th>Fechado</th><th>Entrada</th><th>Conversão</th><th>% Entrada</th><th></th></tr></thead>
+        <tbody>
+          {rows.map(r=>{
+            const conv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0;
+            const ent=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;
+            return <tr key={r.id}>
+              <td>{dateBR(r.data)}</td>
+              <td><b>{r.paciente}</b></td>
+              <td>{brl(r.oportunidade)}</td>
+              <td>{brl(r.fechado)}</td>
+              <td>{brl(r.entrada)}</td>
+              <td><span className={conv>=30?"pill green":"pill red"}>{pct(conv)}</span></td>
+              <td><span className={`pill ${ent>=20&&ent<=30?"green":ent<20?"red":"orange"}`}>{pct(ent)}</span></td>
+              <td>
+                <button className="rowBtn" onClick={()=>onEdit(r)}><Pencil size={16}/></button>
+                <button className="rowBtn danger" onClick={()=>onDelete(r.id)}><Trash2 size={16}/></button>
+              </td>
+            </tr>
+          })}
+          {!rows.length&&<tr><td colSpan="8" className="empty">Nenhum fechamento de Follow-up cadastrado.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+  </div>
 }
 
 function UsersPage({users,onRefresh,showToast}){
