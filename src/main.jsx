@@ -45,8 +45,8 @@ const calc = (rows=[]) => {
 
   // IMPORTANTE: os percentuais são calculados sobre os TOTAIS do período.
   const conversao = oportunidades > 0 ? (fechado / oportunidades) * 100 : 0;
-  // Regra comercial do Buono Dashboard: % de entrada = entradas / oportunidades × 100.
-  const entradaPct = oportunidades > 0 ? (entrada / oportunidades) * 100 : 0;
+  // REGRA OFICIAL: % de entrada = total de entradas / total de tratamentos fechados × 100.
+  const entradaPct = fechado > 0 ? (entrada / fechado) * 100 : 0;
 
   return {
     oportunidades,
@@ -325,7 +325,7 @@ function Dashboard({rows,stats,day,week,month,chartData,weekChart,period,setPeri
       <Stat icon={CheckCircle2} label="Total fechado" value={brl(stats.fechado)} positive/>
       <Stat icon={Target} label="Taxa de conversão" value={pct(stats.conversao)} status={stats.conversao>=META_CONVERSAO?"green":"red"} sub={`${stats.conversao>=META_CONVERSAO?"Acima da meta":"Abaixo da meta"} · mínimo ${META_CONVERSAO}%`}/>
       <Stat icon={WalletCards} label="Total de entradas" value={brl(stats.entrada)}/>
-      <Stat icon={TrendingUp} label="% de entrada" value={pct(stats.entradaPct)} status={stats.entradaPct>=20&&stats.entradaPct<=30?"green":stats.entradaPct<20?"red":"orange"} sub={`${stats.entradaPct>=20&&stats.entradaPct<=30?"Dentro do ideal":stats.entradaPct<20?"Abaixo do ideal":"Acima do ideal"} · mínimo ${META_ENTRADA_MIN}% · ${brl(stats.entrada)} ÷ ${brl(stats.oportunidades)}`}/>
+      <Stat icon={TrendingUp} label="% de entrada" value={pct(stats.entradaPct)} status={stats.entradaPct>=20&&stats.entradaPct<=30?"green":stats.entradaPct<20?"red":"orange"} sub={`${stats.entradaPct>=20&&stats.entradaPct<=30?"Dentro do ideal":stats.entradaPct<20?"Abaixo do ideal":"Acima do ideal"} · mínimo ${META_ENTRADA_MIN}% · ${brl(stats.entrada)} ÷ ${brl(stats.fechado)}`}/>
     </div>
 
     <FollowUpSummary rows={rows}/>
@@ -363,7 +363,7 @@ function Badge({value,type}){let text="",cl="";if(type==="conversion"){cl=value>
 function Launches({rows,search,setSearch,onEdit,onDelete,stats}){
   return <div className="content"><div className="listTop"><div><h2>Histórico dos pacientes</h2><span>{rows.length} lançamento(s) no período</span></div><div className="search"><Search size={18}/><input placeholder="Buscar paciente..." value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
   <section className="panel tableWrap"><table><thead><tr><th>Data</th><th>Paciente</th><th>Oportunidade</th><th>Fechado</th><th>Entrada</th><th>Conversão</th><th>% Entrada</th><th></th></tr></thead><tbody>
-  {rows.map(r=>{const conv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0;const ent=r.oportunidade?Number(r.entrada)/Number(r.oportunidade)*100:0;return <tr key={r.id}><td>{dateBR(r.data)}</td><td><b>{r.paciente}</b></td><td>{brl(r.oportunidade)}</td><td>{brl(r.fechado)}</td><td>{brl(r.entrada)}</td><td><span className={conv>=30?"pill green":"pill red"}>{pct(conv)}</span></td><td><span className={`pill ${ent>=20&&ent<=30?"green":ent<20?"red":"orange"}`}>{pct(ent)}</span></td><td><button className="rowBtn" onClick={()=>onEdit(r)}><Pencil size={16}/></button><button className="rowBtn danger" onClick={()=>onDelete(r.id)}><Trash2 size={16}/></button></td></tr>})}
+  {rows.map(r=>{const conv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0;const ent=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;return <tr key={r.id}><td>{dateBR(r.data)}</td><td><b>{r.paciente}</b></td><td>{brl(r.oportunidade)}</td><td>{brl(r.fechado)}</td><td>{brl(r.entrada)}</td><td><span className={conv>=30?"pill green":"pill red"}>{pct(conv)}</span></td><td><span className={`pill ${ent>=20&&ent<=30?"green":ent<20?"red":"orange"}`}>{pct(ent)}</span></td><td><button className="rowBtn" onClick={()=>onEdit(r)}><Pencil size={16}/></button><button className="rowBtn danger" onClick={()=>onDelete(r.id)}><Trash2 size={16}/></button></td></tr>})}
   {!rows.length&&<tr><td colSpan="8" className="empty">Nenhum lançamento encontrado.</td></tr>}</tbody></table></section></div>
 }
 
@@ -428,7 +428,7 @@ function FollowUpPage({rows,onEdit,onDelete,onNew}){
         <tbody>
           {rows.map(r=>{
             const conv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0;
-            const ent=r.oportunidade?Number(r.entrada)/Number(r.oportunidade)*100:0;
+            const ent=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;
             return <tr key={r.id}>
               <td>{dateBR(r.data)}</td>
               <td><b>{r.paciente}</b></td>
