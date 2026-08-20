@@ -8,3 +8,21 @@
 
 .threeCol{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:15px}
 @media(max-width:1100px){.threeCol{grid-template-columns:1fr}}
+
+/* Ajustes de layout e comparação */
+.content{max-width:100%;overflow-x:hidden}
+.threeCol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:15px}
+.threeCol .panel{min-width:0;padding:16px}
+.threeCol .panelHead{gap:8px}
+.threeCol .miniGrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:16px}
+.threeCol .miniGrid div{min-width:0;padding:9px 7px}
+.threeCol .miniGrid span{font-size:8px;line-height:1.2}
+.threeCol .miniGrid b{font-size:11px;white-space:nowrap}
+.miniGrid em{display:block;font-style:normal;font-size:7px;color:#0d47a1;margin-top:2px}
+.comparisonPanel{margin-top:15px}
+.comparisonTableWrap{overflow-x:auto;margin-top:16px}
+.comparisonTable{width:100%;border-collapse:collapse;font-size:11px}
+.comparisonTable th{background:#f4f7fb;color:#6f7f93;text-align:left;padding:11px 10px;font-size:9px;text-transform:uppercase}
+.comparisonTable td{padding:12px 10px;border-top:1px solid #e8eef5;white-space:nowrap}
+@media(max-width:1250px){.threeCol{grid-template-columns:1fr}.threeCol .miniGrid{grid-template-columns:repeat(5,1fr)}}
+@media(max-width:780px){.threeCol .miniGrid{grid-template-columns:repeat(2,1fr)}}
