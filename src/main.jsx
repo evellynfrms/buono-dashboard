@@ -12,6 +12,7 @@ import {
   AlertCircle, UserRound
 } from "lucide-react";
 import { jsPDF } from "jspdf";
+import "./styles.css";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -391,3 +392,5 @@ function UsersPage({users,onRefresh,showToast}){
 }
 
 export default App;
+
+createRoot(document.getElementById("root")).render(<App />);
