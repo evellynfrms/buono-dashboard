@@ -14,8 +14,8 @@ import {
 import { jsPDF } from "jspdf";
 import "./styles.css";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL || "").trim().replace(/\/$/, "");
+const SUPABASE_ANON_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim();
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
@@ -216,7 +216,7 @@ function App() {
 }
 
 function SetupScreen(){
-  return <div className="center"><div className="setup"><div className="brandMark big">B</div><h1>BUONO DASHBOARD</h1><p>Configure as variáveis do Supabase para colocar o painel online.</p><code>VITE_SUPABASE_URL<br/>VITE_SUPABASE_ANON_KEY</code><p>Depois execute <b>npm install</b> e <b>npm run dev</b>.</p></div></div>
+  return <div className="center"><div className="setup"><div className="brandMark big">B</div><h1>BUONO DASHBOARD</h1><p>O site não encontrou a conexão com o Supabase.</p><code>VITE_SUPABASE_URL<br/>VITE_SUPABASE_ANON_KEY</code><p>Confira essas duas variáveis na Vercel e faça um novo deploy.</p></div></div>
 }
 
 function Auth({mode,setMode,showToast}){
@@ -225,7 +225,59 @@ function Auth({mode,setMode,showToast}){
     e.preventDefault();setBusy(true);
     try{
       if(mode==="login"){
-        const {error}=await supabase.auth.signInWithPassword({email,password}); if(error) throw error;
+        // Login direto pela API do Supabase com timeout.
+        // Isso evita o botão ficar preso em "Entrando..." caso o SDK não conclua a requisição.
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        let response;
+        try {
+          response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ email: email.trim(), password }),
+            signal: controller.signal
+          });
+        } catch (networkError) {
+          if (networkError?.name === "AbortError") {
+            throw new Error("O Supabase demorou para responder. Confira a URL e a Publishable key na Vercel.");
+          }
+          throw new Error("Não foi possível conectar ao Supabase. Verifique sua internet e as variáveis da Vercel.");
+        } finally {
+          clearTimeout(timeout);
+        }
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const msg =
+            result?.msg ||
+            result?.message ||
+            result?.error_description ||
+            result?.error ||
+            "E-mail ou senha inválidos.";
+          throw new Error(msg);
+        }
+
+        if (!result.access_token || !result.refresh_token) {
+          throw new Error("O login foi aceito, mas a sessão não foi retornada pelo Supabase.");
+        }
+
+        const { data, error } = await supabase.auth.setSession({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token
+        });
+
+        if (error) throw error;
+        if (!data?.session) throw new Error("Não foi possível iniciar a sessão.");
+
+        // Atualiza imediatamente a tela, sem depender apenas do evento de autenticação.
+        setBusy(false);
+        window.location.reload();
+        return;
       }else{
         const {data,error}=await supabase.auth.signUp({email,password,options:{data:{nome}}}); if(error) throw error;
         if(!data.session) showToast("Conta criada. Verifique o e-mail para confirmar o acesso.");
