@@ -177,12 +177,36 @@ function App() {
     const cards=[["Oportunidades",brl(s.oportunidades)],["Total fechado",brl(s.fechado)],["Conversao",pct(s.conversao)],["Entradas",brl(s.entrada)],["% entrada",pct(s.entradaPct)],["Nao fechado",brl(s.naoFechado)],["Saldo",brl(s.saldo)]];
     let x=M,y=44; cards.forEach((c,i)=>{if(i===4){x=M;y=67} doc.setFillColor(247,249,252);doc.roundedRect(x,y,42,17,2,2,"F");muted();doc.setFontSize(7);doc.setFont("helvetica","normal");doc.text(c[0],x+3,y+5);dark();doc.setFontSize(9);doc.setFont("helvetica","bold");doc.text(c[1],x+3,y+11.5);x+=45});
     y=91;doc.setFillColor(238,245,255);doc.roundedRect(M,y,182,17,2,2,"F");blue();doc.setFontSize(8);doc.setFont("helvetica","bold");doc.text(`Meta conversao: 30% | Resultado: ${pct(s.conversao)} | ${s.conversao>=30?"ACIMA DA META":"ABAIXO DA META"}`,M+4,y+6);const el=s.entradaPct>=20&&s.entradaPct<=30?"DENTRO DO IDEAL":s.entradaPct<20?"ABAIXO DO IDEAL":"ACIMA DO IDEAL";doc.text(`Meta entrada: 20% a 30% | Resultado: ${pct(s.entradaPct)} | ${el}`,M+4,y+12);
-    const follow=calc(filtered.filter(r=>r.origem==="followup"));y=116;dark();doc.setFontSize(10);doc.text("Follow-up no periodo",M,y);muted();doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text(`Fechado: ${brl(follow.fechado)} | Entradas: ${brl(follow.entrada)} | Conversao: ${pct(follow.conversao)}`,M,y+6);
-    y=132;dark();doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text("Lancamentos do periodo",M,y);y+=5;
-    const widths=[18,38,28,28,25,21,22], starts=[M];for(let i=1;i<widths.length;i++)starts.push(starts[i-1]+widths[i-1]);const heads=["Data","Paciente","Oportun.","Fechado","Entrada","Conv.","% Entr."];
-    const header=()=>{doc.setFillColor(13,71,161);doc.rect(M,y,180,8,"F");doc.setTextColor(255,255,255);doc.setFontSize(7);doc.setFont("helvetica","bold");heads.forEach((h,i)=>doc.text(h,starts[i]+1.5,y+5.2));y+=8};header();
-    filtered.forEach((r,i)=>{if(y>276){doc.addPage();y=15;header()}const cv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0,en=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;const g=i%2?248:253;doc.setFillColor(g,g,g);doc.rect(M,y,180,8,"F");dark();doc.setFont("helvetica","normal");doc.setFontSize(6.7);let name=String(r.paciente||"");if(name.length>21)name=name.slice(0,20)+"...";[dateBR(r.data).slice(0,5),name,brl(r.oportunidade),brl(r.fechado),brl(r.entrada),pct(cv),pct(en)].forEach((v,j)=>doc.text(String(v),starts[j]+1.5,y+5.2));y+=8});
-    if(!filtered.length){muted();doc.setFontSize(9);doc.text("Nenhum lancamento no periodo selecionado.",M,y+7)}
+    const consultaRows=filtered.filter(r=>r.origem!=="followup");
+    const followRows=filtered.filter(r=>r.origem==="followup");
+    const consulta=calc(consultaRows), follow=calc(followRows);
+
+    const drawSummary=(titulo,s,y)=>{
+      dark();doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(titulo,M,y);
+      muted();doc.setFont("helvetica","normal");doc.setFontSize(8);
+      doc.text(`Oportunidades: ${brl(s.oportunidades)} | Fechado: ${brl(s.fechado)} | Entradas: ${brl(s.entrada)}`,M,y+6);
+      doc.text(`Conversao: ${pct(s.conversao)} | % Entrada: ${pct(s.entradaPct)}`,M,y+11);
+      return y+17;
+    };
+
+    const drawTable=(titulo,data,y)=>{
+      if(y>238){doc.addPage();y=18}
+      dark();doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(titulo,M,y);y+=5;
+      const widths=[18,38,28,28,25,21,22], starts=[M];
+      for(let i=1;i<widths.length;i++)starts.push(starts[i-1]+widths[i-1]);
+      const heads=["Data","Paciente","Oportun.","Fechado","Entrada","Conv.","% Entr."];
+      const header=()=>{doc.setFillColor(13,71,161);doc.rect(M,y,180,8,"F");doc.setTextColor(255,255,255);doc.setFontSize(7);doc.setFont("helvetica","bold");heads.forEach((h,i)=>doc.text(h,starts[i]+1.5,y+5.2));y+=8};
+      header();
+      if(!data.length){muted();doc.setFontSize(8);doc.text("Nenhum lancamento nesta categoria.",M+2,y+6);return y+13}
+      data.forEach((r,i)=>{if(y>276){doc.addPage();y=18;header()}const cv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0,en=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;const g=i%2?248:253;doc.setFillColor(g,g,g);doc.rect(M,y,180,8,"F");dark();doc.setFont("helvetica","normal");doc.setFontSize(6.7);let name=String(r.paciente||"");if(name.length>21)name=name.slice(0,20)+"...";[dateBR(r.data).slice(0,5),name,brl(r.oportunidade),brl(r.fechado),brl(r.entrada),pct(cv),pct(en)].forEach((v,j)=>doc.text(String(v),starts[j]+1.5,y+5.2));y+=8});
+      return y+7;
+    };
+
+    y=116;
+    y=drawSummary("RESULTADOS EM CONSULTA",consulta,y);
+    y=drawTable("Valores passados e fechamentos em consulta",consultaRows,y);
+    y=drawSummary("RESULTADOS DE FOLLOW-UP",follow,y);
+    y=drawTable("Fechamentos de Follow-up",followRows,y);
     const pages=doc.getNumberOfPages();for(let n=1;n<=pages;n++){doc.setPage(n);muted();doc.setFontSize(7);doc.text(`Periodo: ${dateBR(a)} a ${dateBR(b)}`,M,291);doc.text(`Pagina ${n} de ${pages}`,196,291,{align:"right"})}
     doc.save(`buono-dashboard-${a}-a-${b}.pdf`);
   };
@@ -216,7 +240,7 @@ function App() {
       </header>
 
       {page==="dashboard" && <Dashboard rows={filtered} stats={currentStats} day={dayStats} week={weekStats} month={monthStats} chartData={chartData} weekChart={weekChart} period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo} onPDF={generatePDF}/>}
-      {page==="lancamentos" && <Launches rows={tableFiltered.filter(r=>!r.origem || r.origem==="dia" || r.origem==="total_dia")} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r})} onDelete={deleteRow} stats={currentStats}/>}
+      {page==="lancamentos" && <Launches rows={tableFiltered} search={search} setSearch={setSearch} onEdit={r=>setModal({type:"launch",row:r,origem:r.origem==="followup"?"followup":"dia"})} onDelete={deleteRow}/>}
       
       {page==="followup" && <FollowUpPage
         rows={filtered.filter(r=>r.origem==="followup")}
@@ -360,11 +384,32 @@ function MiniStats({s}){return <div className="miniGrid"><div><span>Oportunidade
 function Stat({icon:Icon,label,value,status,sub}){return <div className="stat"><div className="statIcon"><Icon size={20}/></div><span>{label}</span><strong>{value}</strong>{sub&&<small className={status}>{status==="green"?"🟢":status==="red"?"🔴":"🟠"} {sub}</small>}</div>}
 function Badge({value,type}){let text="",cl="";if(type==="conversion"){cl=value>=30?"green":"red";text=value>=30?"ACIMA DA META":"ABAIXO DA META"}else{cl=value>=20&&value<=30?"green":value<20?"red":"orange";text=value>=20&&value<=30?"DENTRO DO IDEAL":value<20?"ABAIXO DO IDEAL":"ACIMA DO IDEAL"}return <span className={`badge ${cl}`}>{cl==="green"?"🟢":cl==="red"?"🔴":"🟠"} {text}</span>}
 
-function Launches({rows,search,setSearch,onEdit,onDelete,stats}){
-  return <div className="content"><div className="listTop"><div><h2>Histórico dos pacientes</h2><span>{rows.length} lançamento(s) no período</span></div><div className="search"><Search size={18}/><input placeholder="Buscar paciente..." value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
-  <section className="panel tableWrap"><table><thead><tr><th>Data</th><th>Paciente</th><th>Oportunidade</th><th>Fechado</th><th>Entrada</th><th>Conversão</th><th>% Entrada</th><th></th></tr></thead><tbody>
-  {rows.map(r=>{const conv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0;const ent=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;return <tr key={r.id}><td>{dateBR(r.data)}</td><td><b>{r.paciente}</b></td><td>{brl(r.oportunidade)}</td><td>{brl(r.fechado)}</td><td>{brl(r.entrada)}</td><td><span className={conv>=30?"pill green":"pill red"}>{pct(conv)}</span></td><td><span className={`pill ${ent>=20&&ent<=30?"green":ent<20?"red":"orange"}`}>{pct(ent)}</span></td><td><button className="rowBtn" onClick={()=>onEdit(r)}><Pencil size={16}/></button><button className="rowBtn danger" onClick={()=>onDelete(r.id)}><Trash2 size={16}/></button></td></tr>})}
-  {!rows.length&&<tr><td colSpan="8" className="empty">Nenhum lançamento encontrado.</td></tr>}</tbody></table></section></div>
+function Launches({rows,search,setSearch,onEdit,onDelete}){
+  const consultaRows=rows.filter(r=>r.origem!=="followup");
+  const followRows=rows.filter(r=>r.origem==="followup");
+  const geral=calc(rows), consulta=calc(consultaRows), follow=calc(followRows);
+
+  const Resumo=({titulo,sub,s})=><section className="panel" style={{marginBottom:15}}>
+    <div className="panelHead"><div><h2>{titulo}</h2><span>{sub}</span></div></div>
+    <MiniStats s={s}/>
+  </section>;
+
+  const Tabela=({data,vazio})=><section className="panel tableWrap" style={{marginBottom:20}}><table>
+    <thead><tr><th>Data</th><th>Paciente</th><th>Oportunidade</th><th>Fechado</th><th>Entrada</th><th>Conversão</th><th>% Entrada</th><th></th></tr></thead>
+    <tbody>
+      {data.map(r=>{const conv=r.oportunidade?Number(r.fechado)/Number(r.oportunidade)*100:0;const ent=r.fechado?Number(r.entrada)/Number(r.fechado)*100:0;return <tr key={r.id}><td>{dateBR(r.data)}</td><td><b>{r.paciente}</b></td><td>{brl(r.oportunidade)}</td><td>{brl(r.fechado)}</td><td>{brl(r.entrada)}</td><td><span className={conv>=30?"pill green":"pill red"}>{pct(conv)}</span></td><td><span className={`pill ${ent>=20&&ent<=30?"green":ent<20?"red":"orange"}`}>{pct(ent)}</span></td><td><button className="rowBtn" onClick={()=>onEdit(r)}><Pencil size={16}/></button><button className="rowBtn danger" onClick={()=>onDelete(r.id)}><Trash2 size={16}/></button></td></tr>})}
+      {!data.length&&<tr><td colSpan="8" className="empty">{vazio}</td></tr>}
+    </tbody>
+  </table></section>;
+
+  return <div className="content">
+    <div className="listTop"><div><h2>Lançamentos do período</h2><span>Consulta e Follow-up separados</span></div><div className="search"><Search size={18}/><input placeholder="Buscar paciente..." value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
+    <Resumo titulo="📊 Total geral do período" sub="Consulta + Follow-up" s={geral}/>
+    <Resumo titulo="🦷 Valores passados e fechamentos em consulta" sub={`${consultaRows.length} lançamento(s) de consulta`} s={consulta}/>
+    <Tabela data={consultaRows} vazio="Nenhum lançamento de consulta encontrado."/>
+    <Resumo titulo="🔄 Fechamentos de Follow-up" sub={`${followRows.length} lançamento(s) de Follow-up`} s={follow}/>
+    <Tabela data={followRows} vazio="Nenhum fechamento de Follow-up encontrado."/>
+  </div>
 }
 
 function LaunchModal({row,origem="dia",onClose,onSaved,showToast}){
